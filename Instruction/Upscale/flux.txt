@@ -1,0 +1,216 @@
+О
+Создать изображение
+
+1. Вызов API
+#
+Установить клиент
+#
+Клиент предоставляет удобный способ взаимодействия с API модели.
+
+
+нпм
+
+пряжа
+
+пнпм
+
+булочка
+
+npm install --save @fal-ai/client
+Перейти на @fal-ai/client
+Пакет @fal-ai/serverless-clientустарел в пользу @fal-ai/client. Подробнее см. в руководстве по миграции .
+
+Настройте свой ключ API
+#
+Установите FAL_KEYкак переменную среды во время выполнения.
+
+
+export FAL_KEY="YOUR_API_KEY"
+Подать запрос
+#
+Клиентский API обрабатывает протокол отправки API. Он обрабатывает обновления статуса запроса и возвращает результат после его завершения.
+
+
+import { fal } from "@fal-ai/client";
+
+const result = await fal.subscribe("fal-ai/flux-vision-upscaler", {
+  input: {
+    image_url: "https://storage.googleapis.com/falserverless/gallery/NOCA_Mick-Thompson.resized.resized.jpg"
+  },
+  logs: true,
+  onQueueUpdate: (update) => {
+    if (update.status === "IN_PROGRESS") {
+      update.logs.map((log) => log.message).forEach(console.log);
+    }
+  },
+});
+console.log(result.data);
+console.log(result.requestId);
+2. Аутентификация
+#
+API использует API-ключ для аутентификации. Рекомендуется FAL_KEYпо возможности задать переменную окружения в среде выполнения.
+
+API-ключ
+#
+Если ваше приложение работает в среде, в которой невозможно задать переменные среды, вы можете вручную задать ключ API как конфигурацию клиента.
+
+import { fal } from "@fal-ai/client";
+
+fal.config({
+  credentials: "YOUR_FAL_KEY"
+});
+Защитите свой ключ API
+При запуске кода на стороне клиента (например, в браузере, мобильном приложении или графическом пользовательском интерфейсе) убедитесь, что ваш FAL_KEY. Вместо этого используйте серверный прокси-сервер для запросов к API. Подробнее см. в нашем руководстве по интеграции на стороне сервера .
+
+3. Очередь
+#
+Длительные запросы
+Для длительных запросов, таких как задания по обучению или модели с более медленным временем вывода, рекомендуется проверять состояние очереди и полагаться на веб-перехватчики вместо блокировки в ожидании результата.
+
+Подать запрос
+#
+Клиентский API обеспечивает удобный способ отправки запросов к модели.
+
+
+import { fal } from "@fal-ai/client";
+
+const { request_id } = await fal.queue.submit("fal-ai/flux-vision-upscaler", {
+  input: {
+    image_url: "https://storage.googleapis.com/falserverless/gallery/NOCA_Mick-Thompson.resized.resized.jpg"
+  },
+  webhookUrl: "https://optional.webhook.url/for/results",
+});
+Статус запроса на выборку
+#
+Вы можете получить статус запроса, чтобы проверить, завершен ли он или все еще находится в процессе выполнения.
+
+
+import { fal } from "@fal-ai/client";
+
+const status = await fal.queue.status("fal-ai/flux-vision-upscaler", {
+  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b",
+  logs: true,
+});
+Получите результат
+#
+После выполнения запроса вы можете получить результат. Ожидаемый формат результата см. в схеме вывода .
+
+
+import { fal } from "@fal-ai/client";
+
+const result = await fal.queue.result("fal-ai/flux-vision-upscaler", {
+  requestId: "764cabcf-b745-4b3e-ae38-1200304cf45b"
+});
+console.log(result.data);
+console.log(result.requestId);
+4. Файлы
+#
+Некоторые атрибуты API принимают URL-адреса файлов в качестве входных данных. В этом случае вы можете передать свой собственный URL-адрес или URI данных в кодировке Base64.
+
+URI данных (base64)
+#
+Вы можете передать URI данных Base64 в качестве входных данных файла. API выполнит декодирование файла автоматически. Имейте в виду, что для больших файлов этот вариант, хотя и удобен, может повлиять на производительность запроса.
+
+Размещенные файлы (URL)
+#
+Вы также можете передавать свои собственные URL-адреса, если они общедоступны. Имейте в виду, что некоторые хостинг-провайдеры могут блокировать межсайтовые запросы, устанавливать ограничения по скорости или воспринимать запросы как запросы бота.
+
+Загрузка файлов
+#
+Мы предоставляем удобное файловое хранилище, позволяющее загружать файлы и использовать их в запросах. Вы можете загружать файлы через клиентский API и использовать возвращаемый URL в запросах.
+
+
+import { fal } from "@fal-ai/client";
+
+const file = new File(["Hello, World!"], "hello.txt", { type: "text/plain" });
+const url = await fal.storage.upload(file);
+Автоматические загрузки
+Клиент автоматически загрузит файл, если вы передадите двоичный объект (например File, Data).
+
+Подробнее об обработке файлов читайте в нашем руководстве по загрузке файлов .
+
+5. Схема
+#
+Вход
+#
+image_url string
+URL изображения для масштабирования.
+
+upscale_factor float
+Коэффициент масштабирования (1-4x). Значение по умолчанию:2
+
+seed integer
+Начальное значение для повышения качества. Если не указано, будет использовано случайное начальное значение.
+
+creativity float
+Креативность модели. Чем выше креативность, тем больше модель будет отклоняться от оригинала. Относится к уровню шума при выборке. Значение по умолчанию:0.3
+
+guidance float
+Шкала CFG/наведения (0–20). Управляет точностью следования модели наведению. Значение по умолчанию:1
+
+steps integer
+Количество шагов вывода (4–50). Значение по умолчанию:20
+
+enable_safety_checker boolean
+Включать ли проверку безопасности. Значение по умолчанию:true
+
+
+{
+  "image_url": "https://storage.googleapis.com/falserverless/gallery/NOCA_Mick-Thompson.resized.resized.jpg",
+  "upscale_factor": 2,
+  "creativity": 0.3,
+  "guidance": 1,
+  "steps": 20,
+  "enable_safety_checker": true
+}
+Выход
+#
+image Image
+URL-адрес сгенерированного изображения.
+
+seed integer
+Начальное число, используемое для создания изображения.
+
+timings Timings
+Временные рамки различных этапов рабочего процесса.
+
+caption string
+Сгенерированная VLM подпись, описывающая увеличенное изображение.
+
+
+{
+  "image": {
+    "height": 2048,
+    "file_size": 8842156,
+    "file_name": "20TZeUQtQ8oKgsCKXSL81_StableSR_00002_.png",
+    "content_type": "image/png",
+    "url": "https://v3b.fal.media/files/b/panda/20TZeUQtQ8oKgsCKXSL81_StableSR_00002_.png",
+    "width": 2048
+  },
+  "seed": 42,
+  "timings": {
+    "inference": 52.8
+  },
+  "caption": "A highly detailed upscaled photograph featuring sharp edges and enhanced textures. The image shows improved clarity in fine details with natural color preservation and minimal artifacts, demonstrating the AI-enhanced resolution increase."
+}
+Другие типы
+#
+Изображение
+#
+url string
+URL-адрес, с которого можно загрузить файл.
+
+content_type string
+MIME-тип файла.
+
+file_name string
+Имя файла. Если не указано, оно будет сгенерировано автоматически.
+
+file_size integer
+Размер файла в байтах.
+
+width integer
+Ширина изображения в пикселях.
+
+height integer
+Высота изображения в пикселях.
