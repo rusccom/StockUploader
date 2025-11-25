@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import TopicList from './components/TopicList'
 import TopicForm from './components/TopicForm'
 import AdobeSettings from './components/AdobeSettings'

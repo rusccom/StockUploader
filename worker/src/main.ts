@@ -46,6 +46,18 @@ async function processOneTopic() {
   console.log('='.repeat(60));
 
   try {
+    // Check Adobe SFTP credentials FIRST
+    console.log('\n[Pre-check] Verifying Adobe Stock SFTP credentials...');
+    const adobeCreds = await db.getAdobeCredentials();
+
+    if (!adobeCreds?.sftp_host || !adobeCreds?.sftp_username || !adobeCreds?.sftp_password) {
+      console.error('✗ Adobe Stock SFTP credentials not configured!');
+      console.error('  Please configure SFTP credentials in the web interface before running.');
+      return;
+    }
+
+    console.log('✓ Adobe Stock SFTP credentials verified');
+
     // Get oldest 'new' topic
     console.log('\n[Step 1] Fetching topic from database...');
     const topic = await db.getOldestNewTopic();
@@ -65,30 +77,16 @@ async function processOneTopic() {
     console.log('\n[Step 2] Marking topic as processing...');
     await db.updateTopicStatus(topic.id, 'processing');
 
-    // Get Adobe credentials
-    console.log('\n[Step 3] Getting Adobe Stock credentials...');
-    const adobeCreds = await db.getAdobeCredentials();
-    
-    let accessToken = '';
-    let hasSftpCredentials = false;
-    
-    if (adobeCreds && adobeCreds.client_id && adobeCreds.client_secret) {
+    // Get Adobe OAuth token (optional, for API calls if needed)
+    console.log('\n[Step 3] Getting Adobe OAuth token...');
+    if (adobeCreds.client_id && adobeCreds.client_secret) {
       const tokenData = await getAccessToken(
         adobeCreds.client_id,
         adobeCreds.client_secret
       );
-      accessToken = tokenData.access_token;
       console.log('Adobe OAuth token obtained');
     } else {
-      console.warn('No Adobe API credentials configured.');
-    }
-    
-    // Check for SFTP credentials
-    if (adobeCreds && adobeCreds.sftp_host && adobeCreds.sftp_username && adobeCreds.sftp_password) {
-      hasSftpCredentials = true;
-      console.log('Adobe Stock SFTP credentials available');
-    } else {
-      console.warn('No Adobe Stock SFTP credentials configured. Upload will be skipped.');
+      console.log('Adobe OAuth credentials not configured (optional)');
     }
 
     // Generate prompts with Gemini
@@ -170,17 +168,15 @@ async function processOneTopic() {
         console.log(`  ✓ Metadata embedded`);
 
         // Add to batch upload queue (don't upload immediately)
-        if (hasSftpCredentials && adobeCreds) {
-          generatedImages.push({
-            path: finalImagePath,
-            metadata: {
-              title: promptData.title,
-              keywords: promptData.keywords,
-              description: promptData.description,
-            }
-          });
-          console.log('  → Added to upload queue');
-        }
+        generatedImages.push({
+          path: finalImagePath,
+          metadata: {
+            title: promptData.title,
+            keywords: promptData.keywords,
+            description: promptData.description,
+          }
+        });
+        console.log('  → Added to upload queue');
 
         // Clean up temp file
         try {
@@ -204,7 +200,7 @@ async function processOneTopic() {
     console.log(`  Errors: ${errorCount}`);
 
     // Batch upload all generated images to Adobe Stock via SFTP
-    if (hasSftpCredentials && adobeCreds && generatedImages.length > 0) {
+    if (generatedImages.length > 0) {
       console.log(`\n[Step 6] Uploading ${generatedImages.length} images to Adobe Stock...`);
       console.log('  Using single SFTP connection for all files (batch upload)');
       
@@ -218,8 +214,6 @@ async function processOneTopic() {
       );
       
       console.log(`\n✓ Upload complete: ${uploadedCount}/${generatedImages.length} images uploaded successfully`);
-    } else if (!hasSftpCredentials || !adobeCreds) {
-      console.log('\n[Step 6] Skipping Adobe Stock upload (no SFTP credentials configured)');
     }
 
     // Update upload statistics
