@@ -1,10 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { exec } from 'child_process';
-import { promisify } from 'util';
+import piexif from 'piexifjs';
 import { logStart, logSuccess, logError } from '../../utils/logger.js';
-
-const execPromise = promisify(exec);
 
 export interface ImageMetadata {
   title: string;
@@ -15,67 +12,63 @@ export interface ImageMetadata {
 }
 
 /**
- * Embeds IPTC metadata into a JPEG file using exiftool
- * Note: Requires exiftool to be installed on the system
+ * Embeds EXIF metadata into a JPEG file using piexifjs
+ * Note: IPTC keywords are passed via CSV during SFTP upload
  */
 export async function embedMetadata(
   imagePath: string,
   metadata: ImageMetadata
 ): Promise<void> {
-  const startTime = logStart('EXIFTOOL', 'embedMetadata', {
+  const startTime = logStart('PIEXIF', 'embedMetadata', {
     imagePath: path.basename(imagePath),
     title: metadata.title,
     keywordCount: metadata.keywords.length,
   });
 
-  const args = [
-    `-Title=${metadata.title}`,
-    `-Description=${metadata.description}`,
-    `-Keywords=${metadata.keywords.join(',')}`,
-  ];
-
-  if (metadata.creator) {
-    args.push(`-Creator=${metadata.creator}`);
-  }
-
-  if (metadata.copyright) {
-    args.push(`-Copyright=${metadata.copyright}`);
-  }
-
-  // Add overwrite original flag
-  args.push('-overwrite_original');
-  args.push(imagePath);
-
-  const command = `exiftool ${args.join(' ')}`;
-  console.log(`  Command: exiftool [${args.length} args]`);
-
   try {
-    const { stdout, stderr } = await execPromise(command);
+    const jpegData = await fs.readFile(imagePath);
+    const jpegBinary = jpegData.toString('binary');
     
-    if (stdout) {
-      console.log(`  Stdout: ${stdout.trim()}`);
+    // Load existing EXIF or create new
+    let exifObj: piexif.IExif;
+    try {
+      exifObj = piexif.load(jpegBinary);
+    } catch {
+      exifObj = { '0th': {}, Exif: {}, GPS: {}, Interop: {}, '1st': {} };
+    }
+
+    // Set EXIF tags
+    exifObj['0th'][piexif.ImageIFD.ImageDescription] = metadata.description;
+    
+    if (metadata.creator) {
+      exifObj['0th'][piexif.ImageIFD.Artist] = metadata.creator;
     }
     
-    if (stderr) {
-      console.log(`  Stderr: ${stderr.trim()}`);
-      if (!stderr.includes('image files updated')) {
-        console.warn('  Exiftool warning detected');
-      }
+    if (metadata.copyright) {
+      exifObj['0th'][piexif.ImageIFD.Copyright] = metadata.copyright;
     }
-    
-    logSuccess('EXIFTOOL', 'embedMetadata', startTime, {
-      fieldsEmbedded: args.length - 2, // minus overwrite flag and path
+
+    // Dump and insert EXIF
+    const exifBytes = piexif.dump(exifObj);
+    const newJpegBinary = piexif.insert(exifBytes, jpegBinary);
+    const newJpegBuffer = Buffer.from(newJpegBinary, 'binary');
+
+    await fs.writeFile(imagePath, newJpegBuffer);
+
+    logSuccess('PIEXIF', 'embedMetadata', startTime, {
+      fieldsEmbedded: 3,
+      note: 'Keywords passed via CSV during SFTP upload',
     });
   } catch (error) {
-    logError('EXIFTOOL', 'embedMetadata', error);
+    logError('PIEXIF', 'embedMetadata', error);
     // Continue even if metadata embedding fails
-    console.warn('  Continuing without metadata...');
+    console.warn('  Continuing without embedded metadata...');
   }
 }
 
 /**
- * Alternative: Simple metadata file creation (JSON sidecar)
- * This can be used if exiftool is not available
+ * Creates JSON sidecar file with metadata
+ * Used as backup/reference for image metadata
  */
 export async function createMetadataFile(
   imagePath: string,
@@ -111,4 +104,3 @@ export async function createMetadataFile(
     throw error;
   }
 }
-

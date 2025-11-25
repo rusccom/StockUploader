@@ -101,7 +101,7 @@ StockUploader/
 - `llm/gemini.ts` - генерация промптов
 - `image/{flux,imagen4}.ts` - генерация изображений
 - `upscale/{flux-vision,seedvr}.ts` - апскейлинг
-- `metadata/iptc.ts` - встраивание метаданных
+- `metadata/iptc.ts` - встраивание метаданных (piexifjs, без системных зависимостей)
 - `adobe/auth.ts` - OAuth2 аутентификация для Adobe API
 - `adobe/upload.ts` - загрузка на Adobe Stock через SFTP
   - Создание CSV файлов с метаданными
@@ -274,7 +274,9 @@ image_1.jpg,"Sunset on tropical beach","sunset,beach,tropical,ocean,sky",,"No"
 
 ### Технические детали
 
-**Библиотека**: `ssh2-sftp-client` (Node.js)
+**Библиотеки**: 
+- `ssh2-sftp-client` (Node.js) - SFTP загрузка
+- `piexifjs` - встраивание EXIF метаданных
 **Retry логика**: 3 попытки с таймаутом 2 секунды
 **Обработка ошибок**: Логирование и продолжение с следующим файлом
 
@@ -380,10 +382,10 @@ image_1.jpg,"Sunset on tropical beach","sunset,beach,tropical,ocean,sky",,"No"
 - Логируются: входной/выходной URL, upscale factor, метод
 - Прогресс обработки
 
-#### Метаданные (EXIFTOOL)
-- Встраивание IPTC метаданных через ExifTool
+#### Метаданные (PIEXIF)
+- Встраивание EXIF метаданных через piexifjs (без системных зависимостей)
 - Создание JSON sidecar файлов
-- Полный вывод stdout/stderr от ExifTool
+- Ключевые слова передаются через CSV при SFTP загрузке
 
 #### HTTP Загрузки (DOWNLOAD)
 - Скачивание изображений из FAL AI

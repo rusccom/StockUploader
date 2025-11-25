@@ -31,7 +31,7 @@ export async function generateImage(
         prompt: prompt,
         num_images: 1,
         aspect_ratio: ratio,
-        output_format: 'png',
+        output_format: 'jpeg',
         resolution: '2K',
       },
       logs: true,
@@ -52,7 +52,7 @@ export async function generateImage(
     
     logSuccess('FAL_IMAGEN4', 'generateImage', startTime, {
       imageUrl: imageUrl.substring(0, 50) + '...',
-      format: 'png',
+      format: 'jpeg',
       resolution: '2K',
       aspectRatio: ratio,
     });
