@@ -60,7 +60,7 @@ Ensure variety in composition, lighting, subjects, and mood while maintaining pr
 Return ONLY valid JSON array format as specified in the system prompt.`;
 
     const requestBody = JSON.stringify({
-      model: 'google/gemini-2.0-flash-exp:free',
+      model: 'google/gemini-3-pro-preview',
       messages: [
         {
           role: 'system',
@@ -73,7 +73,7 @@ Return ONLY valid JSON array format as specified in the system prompt.`;
       ],
     });
 
-    console.log(`  API: OpenRouter (Gemini 2.0 Flash)`);
+    console.log(`  API: OpenRouter (Gemini 3 Pro)`);
     console.log(`  Request size: ${formatBytes(requestBody.length)}`);
 
     const response = await fetch(
